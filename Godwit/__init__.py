@@ -31,16 +31,15 @@ class Migrate:
                         print "Migrating to %s" % migration_script
                         cur.execute(script_file.read())
                         cur.execute(self.query_insert_version, (os.path.splitext(migration_script)[0], dt.now()))
+                        if self.commit:
+                          self.conn.commit()
+                        else:
+                          self.conn.rollback()
+                          print "Migration was rolled back since running in dry-run mode."
                     except Exception:
                         self.conn.rollback()
-                        print "Migration failed in script %s"
+                        print "Migration failed in script %s" % migration_script
                         raise
-
-            if self.commit:
-                self.conn.commit()
-            else:
-                self.conn.rollback()
-                print "Migration was rolled back since running in dry-run mode."
         finally:
             cur.close()
 
@@ -67,12 +66,13 @@ def main(argv):
     parser.add_argument('database')
     parser.add_argument('user')
     parser.add_argument('password')
+    parser.add_argument('port')
     parser.add_argument('migrationdir')
     parser.add_argument('--version', default=None)
 
     args = parser.parse_args(argv[1:len(argv)])
 
-    conn = psycopg2.connect(host=args.host, database=args.database, user=args.user, password=args.password)
+    conn = psycopg2.connect(host=args.host, database=args.database, user=args.user, password=args.password, port=args.port)
     try:
         m = MigratePostgres(conn, args.migrationdir, commit=not args.dry_run)
         m.migrate(args.version)

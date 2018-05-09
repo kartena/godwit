@@ -34,7 +34,7 @@ lexicographic order.
 Migration can then be run from the command line:
 
 ```shell
-python -m Godwit [host] [database] [username] [password] [script-dir] [version]
+python -m Godwit [host] [database] [username] [password] [port] [script-dir] --version [version]
 ```
 
 This will connect to the provided ```host``` and ```database```, and migrate
