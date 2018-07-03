@@ -5,10 +5,11 @@ import argparse
 import psycopg2
 
 class Migrate:
-    def __init__(self, conn, migration_dir, commit=True):
+    def __init__(self, conn, migration_dir, commit_per_script=True, commit=True):
         self.conn = conn
         self.migration_dir = migration_dir
         self.commit = commit
+        self.commit_per_script = commit_per_script
 
     def get_current_version(self):
         cur = self.conn.cursor()
@@ -31,15 +32,23 @@ class Migrate:
                         print "Migrating to %s" % migration_script
                         cur.execute(script_file.read())
                         cur.execute(self.query_insert_version, (os.path.splitext(migration_script)[0], dt.now()))
-                        if self.commit:
-                          self.conn.commit()
-                        else:
-                          self.conn.rollback()
-                          print "Migration was rolled back since running in dry-run mode."
+                        if self.commit_per_script:
+                          if self.commit:
+                            self.conn.commit()
+                          else:
+                            self.conn.rollback()
+                            print "Migration was rolled back since running in dry-run mode."
                     except Exception:
                         self.conn.rollback()
                         print "Migration failed in script %s" % migration_script
                         raise
+
+            if not self.commit_per_script:
+              if self.commit:
+                self.conn.commit()
+              else:
+                self.conn.rollback()
+                print "Migration was rolled back since running in dry-run mode."
         finally:
             cur.close()
 
@@ -56,8 +65,8 @@ class MigratePostgres(Migrate):
     query_curr_version = 'select version from _version order by version desc limit 1'
     query_insert_version = 'insert into _version (version, datetime) values (%s, %s)'
 
-    def __init__(self, conn, migration_dir, commit):
-        Migrate.__init__(self, conn, migration_dir, commit)
+    def __init__(self, conn, migration_dir, commit, commit_per_script):
+        Migrate.__init__(self, conn, migration_dir, commit, commit_per_script)
 
 def main(argv):
     parser = argparse.ArgumentParser()
@@ -69,12 +78,13 @@ def main(argv):
     parser.add_argument('port')
     parser.add_argument('migrationdir')
     parser.add_argument('--version', default=None)
+    parser.add_argument('--commit_per_script', default=True)
 
     args = parser.parse_args(argv[1:len(argv)])
 
     conn = psycopg2.connect(host=args.host, database=args.database, user=args.user, password=args.password, port=args.port)
     try:
-        m = MigratePostgres(conn, args.migrationdir, commit=not args.dry_run)
+        m = MigratePostgres(conn, args.migrationdir, commit_per_script=args.commit_per_script, commit=not args.dry_run)
         m.migrate(args.version)
     finally:
         conn.close()
