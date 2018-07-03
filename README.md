@@ -39,3 +39,16 @@ python -m Godwit [host] [database] [username] [password] [port] [script-dir] --v
 
 This will connect to the provided ```host``` and ```database```, and migrate
 the database to the provided ```version``` using the scripts in ```script-dir```.
+
+Docker
+------
+
+Build image
+
+```shell
+docker build
+```
+
+```shell
+docker run --rm -it --net=host -v migrations/:/data -v logs:/logs godwit [host] [database] [user] [password] [port] [script-dir] --version [version]
+```
